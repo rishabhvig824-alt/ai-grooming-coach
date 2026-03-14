@@ -1,8 +1,10 @@
 """
 AI Grooming Coach — FastAPI service
 Endpoints:
-  GET  /health        — liveness check
-  POST /analyze       — analyze a photo and return grooming feedback
+  GET  /health             — liveness check
+  POST /analyze            — analyze a photo and return grooming feedback
+  POST /simulate           — start an async Replicate simulation, returns prediction_id
+  GET  /simulate/status    — poll a Replicate prediction for status and image URL
 """
 
 import os
@@ -130,7 +132,7 @@ async def simulate(
         )
 
     try:
-        prediction_id = start_simulation(image_bytes, variant)
+        prediction_id = await start_simulation(image_bytes, variant, photo.content_type or "image/jpeg")
     except RuntimeError as e:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

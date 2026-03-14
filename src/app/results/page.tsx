@@ -31,11 +31,9 @@ const AREA_LABELS: Record<string, string> = {
 
 const ALL_VARIANTS = Object.keys(simulationVariants) as SimulationVariant[];
 
-const IDLE_STATE: SimulationState = { status: "idle", imageUrl: null };
-
 function buildInitialSimMap(): Record<SimulationVariant, SimulationState> {
   return Object.fromEntries(
-    ALL_VARIANTS.map((v) => [v, IDLE_STATE]),
+    ALL_VARIANTS.map((v) => [v, { status: "idle" as const, imageUrl: null }]),
   ) as Record<SimulationVariant, SimulationState>;
 }
 
@@ -173,7 +171,10 @@ function ResultsDashboard() {
     if (!file) return;
 
     photoFileRef.current = file;
-    triggerSimulation("mid_fade");
+    // Guard: only start if not already loading/ready/failed from a prior render
+    if (simMap["mid_fade"].status === "idle") {
+      triggerSimulation("mid_fade");
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
 
@@ -330,7 +331,7 @@ function ResultsDashboard() {
                           : "bg-chip-inactive text-content-primary"
                       }`}
                     >
-                      {varState.status === "loading" && activeVariant === id && (
+                      {varState.status === "loading" && (
                         <Loader2 className="w-3 h-3 animate-spin" />
                       )}
                       {label}

@@ -87,13 +87,15 @@ export async function startSimulation(
   return data.prediction_id;
 }
 
+type PollStatus = "processing" | "succeeded" | "failed";
+
 /**
  * Poll the status of a Replicate simulation prediction.
  * Returns { status, imageUrl } where status is "processing" | "succeeded" | "failed".
  */
 export async function pollSimulation(
   predictionId: string,
-): Promise<{ status: string; imageUrl: string | null }> {
+): Promise<{ status: PollStatus; imageUrl: string | null }> {
   let response: Response;
   try {
     response = await fetch(
@@ -107,6 +109,6 @@ export async function pollSimulation(
     throw new ApiError(response.status, "Failed to fetch simulation status.");
   }
 
-  const data = await response.json() as { status: string; image_url: string | null };
+  const data = await response.json() as { status: PollStatus; image_url: string | null };
   return { status: data.status, imageUrl: data.image_url };
 }

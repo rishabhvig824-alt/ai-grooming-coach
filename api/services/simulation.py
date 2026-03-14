@@ -32,11 +32,18 @@ _SDXL_VERSION = (
 )
 
 
-def start_simulation(image_bytes: bytes, variant: SimulationVariant) -> str:
+async def start_simulation(
+    image_bytes: bytes,
+    variant: SimulationVariant,
+    content_type: str = "image/jpeg",
+) -> str:
     """
     Submit an img2img prediction to Replicate for the given variant.
     Returns the Replicate prediction ID immediately — does NOT wait for output.
     Raises RuntimeError if REPLICATE_API_TOKEN is not configured.
+
+    content_type should match the uploaded file (e.g. image/png, image/jpeg)
+    so the data URI is correctly formed for all input formats.
     """
     token = os.getenv("REPLICATE_API_TOKEN")
     if not token:
@@ -45,11 +52,11 @@ def start_simulation(image_bytes: bytes, variant: SimulationVariant) -> str:
         )
 
     prompt = VARIANT_PROMPTS[variant]
-    # Encode image as a data URI so Replicate accepts it directly
     image_b64 = base64.b64encode(image_bytes).decode("utf-8")
-    image_data_uri = f"data:image/jpeg;base64,{image_b64}"
+    # Use the actual content type so PNG/HEIC uploads are not misidentified
+    image_data_uri = f"data:{content_type};base64,{image_b64}"
 
-    prediction = replicate.predictions.create(
+    prediction = await replicate.async_predictions.create(
         version=_SDXL_VERSION,
         input={
             "prompt": prompt,
