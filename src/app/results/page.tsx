@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { Download, MessageCircle, ChevronLeft, CheckCircle, ArrowRight } from "lucide-react";
 import { Button, Card, BeforeAfterSlider } from "@/components/ui";
 import { mockAnalysisResult, simulationVariants } from "@/lib/mock-data";
-import type { SimulationVariant } from "@/types/analysis";
+import type { AnalysisResult, AnalysisResponse, FeedbackSection, SimulationVariant } from "@/types/analysis";
 import { Suspense } from "react";
 
 type Tab = "feedback" | "simulation" | "barber-guide";
@@ -23,12 +23,47 @@ const AREA_LABELS: Record<string, string> = {
   mustache: "Mustache",
 };
 
+/** Map the API response shape to the UI data shape */
+function mapApiResponse(response: AnalysisResponse, photoBase64: string): AnalysisResult {
+  return {
+    originalImageUrl: photoBase64,
+    feedback: response.feedback,
+    detected: response.detected_features,
+  };
+}
+
 function ResultsDashboard() {
   const router = useRouter();
+  const params = useSearchParams();
+
   const [activeTab, setActiveTab] = useState<Tab>("feedback");
   const [activeVariant, setActiveVariant] = useState<SimulationVariant>("mid_fade");
+  const [data, setData] = useState<AnalysisResult | null>(null);
 
-  const { feedback, originalImageUrl } = mockAnalysisResult;
+  useEffect(() => {
+    const isMock = params.get("mock") === "1";
+
+    if (!isMock) {
+      const raw = sessionStorage.getItem("analysisResult");
+      const photoBase64 = sessionStorage.getItem("groomingPhotoBeforeUrl");
+      if (raw && photoBase64) {
+        try {
+          const parsed = JSON.parse(raw) as AnalysisResponse;
+          setData(mapApiResponse(parsed, photoBase64));
+          return;
+        } catch {
+          // fall through to mock
+        }
+      }
+    }
+
+    // Fall back to mock data
+    setData(mockAnalysisResult);
+  }, [params]);
+
+  if (!data) return null;
+
+  const { feedback, originalImageUrl } = data;
 
   return (
     <main className="min-h-screen bg-surface-bg flex flex-col">
@@ -69,11 +104,11 @@ function ResultsDashboard() {
         {/* FEEDBACK TAB */}
         {activeTab === "feedback" && (
           <div className="space-y-4">
-            {feedback.map((section) => (
+            {feedback.map((section: FeedbackSection) => (
               <Card key={section.area}>
                 <div className="flex items-center gap-2 mb-3">
                   <CheckCircle className="w-4 h-4 text-feedback-success flex-shrink-0" />
-                  <h2 className="font-bold text-content-primary">{AREA_LABELS[section.area]}</h2>
+                  <h2 className="font-bold text-content-primary">{AREA_LABELS[section.area] ?? section.area}</h2>
                 </div>
                 <p className="text-content-secondary text-sm mb-3 leading-relaxed">
                   {section.positiveObservation}
@@ -145,31 +180,29 @@ function ResultsDashboard() {
               Take this guide to your barber for precise results.
             </p>
 
-            {/* Annotated image placeholder */}
+            {/* Annotated image */}
             <div className="relative rounded-card overflow-hidden shadow-card mb-4 aspect-[3/4] bg-gray-100">
               <Image
                 src={originalImageUrl}
                 alt="Annotated grooming guide"
                 fill
                 className="object-cover"
+                unoptimized={originalImageUrl.startsWith("data:")}
               />
               {/* Annotation overlays */}
               <div className="absolute inset-0 pointer-events-none">
-                {/* Neckline annotation */}
                 <div className="absolute bottom-[28%] left-4 flex items-center gap-2">
                   <div className="w-16 h-px bg-white/90" />
                   <span className="bg-brand-primary text-white text-xs px-2 py-0.5 rounded-full whitespace-nowrap">
                     Neckline
                   </span>
                 </div>
-                {/* Cheek line annotation */}
                 <div className="absolute top-[38%] right-4 flex items-center gap-2 flex-row-reverse">
                   <div className="w-12 h-px bg-white/90" />
                   <span className="bg-brand-primary text-white text-xs px-2 py-0.5 rounded-full whitespace-nowrap">
                     Cheek line
                   </span>
                 </div>
-                {/* Hair annotation */}
                 <div className="absolute top-[10%] left-4 flex items-center gap-2">
                   <div className="w-10 h-px bg-white/90" />
                   <span className="bg-brand-secondary text-white text-xs px-2 py-0.5 rounded-full whitespace-nowrap">

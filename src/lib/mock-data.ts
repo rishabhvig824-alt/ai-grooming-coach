@@ -1,13 +1,9 @@
 import type { AnalysisResult, SimulationVariant } from "@/types/analysis";
 
-/** Realistic mock feedback — replace with live API response in RVI-13 */
+/** Realistic mock feedback — used as fallback when API is unavailable */
 export const mockAnalysisResult: AnalysisResult = {
-  category: "full_grooming",
-  styleGoal: "professional",
   originalImageUrl:
     "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=533&fit=crop&crop=face",
-  simulationImageUrl:
-    "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=400&h=533&fit=crop&crop=face",
   feedback: [
     {
       area: "hair",

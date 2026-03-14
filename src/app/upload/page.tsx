@@ -22,7 +22,9 @@ function UploadForm() {
 
   const [preview, setPreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isStoring, setIsStoring] = useState(false);
   const blobUrlRef = useRef<string | null>(null);
+  const fileRef = useRef<File | null>(null);
 
   const MAX_SIZE_MB = 10;
 
@@ -36,6 +38,7 @@ function UploadForm() {
     if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
     const url = URL.createObjectURL(file);
     blobUrlRef.current = url;
+    fileRef.current = file;
     setPreview(url);
   };
 
@@ -49,17 +52,37 @@ function UploadForm() {
       URL.revokeObjectURL(blobUrlRef.current);
       blobUrlRef.current = null;
     }
+    fileRef.current = null;
     setPreview(null);
     setError(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (cameraInputRef.current) cameraInputRef.current.value = "";
   };
 
-  const handleUsePhoto = () => {
-    const query = new URLSearchParams(params.toString());
-    // In RVI-13, we'll upload the actual file here. For now, navigate with mock flag.
-    query.set("mock", "1");
-    router.push(`/analyzing?${query}`);
+  const handleUsePhoto = async () => {
+    const file = fileRef.current;
+    if (!file) return;
+    setIsStoring(true);
+    setError(null);
+    try {
+      // Encode photo as base64 for sessionStorage handoff to /analyzing
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64 = reader.result as string;
+        sessionStorage.setItem("groomingPhoto", base64);
+        sessionStorage.setItem("groomingPhotoName", file.name);
+        sessionStorage.setItem("groomingPhotoType", file.type);
+        router.push(`/analyzing?${params.toString()}`);
+      };
+      reader.onerror = () => {
+        setError("Failed to read the photo. Please try again.");
+        setIsStoring(false);
+      };
+      reader.readAsDataURL(file);
+    } catch {
+      setError("Failed to prepare the photo. Please try again.");
+      setIsStoring(false);
+    }
   };
 
   return (
@@ -138,10 +161,10 @@ function UploadForm() {
           </div>
 
           <div className="flex flex-col gap-3">
-            <Button fullWidth onClick={handleUsePhoto}>
-              Use This Photo
+            <Button fullWidth onClick={handleUsePhoto} disabled={isStoring}>
+              {isStoring ? "Preparing…" : "Use This Photo"}
             </Button>
-            <Button fullWidth variant="secondary" onClick={handleRetake}>
+            <Button fullWidth variant="secondary" onClick={handleRetake} disabled={isStoring}>
               <RefreshCw className="w-4 h-4 mr-2" /> Retake
             </Button>
           </div>

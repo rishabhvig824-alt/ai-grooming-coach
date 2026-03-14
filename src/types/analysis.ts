@@ -21,14 +21,27 @@ export interface FeedbackSection {
   barberTip: string;
 }
 
-export interface AnalysisResult {
-  category: GroomingCategory;
-  styleGoal: StyleGoal;
+export interface DetectedFeatures {
+  face_detected: boolean;
+  beard_present: boolean;
+  mustache_present: boolean;
+  face_landmark_count: number;
+  notes?: string | null;
+}
+
+/** Shape returned by the FastAPI /analyze endpoint */
+export interface AnalysisResponse {
   feedback: FeedbackSection[];
-  /** Simulated "improved" image URL for before/after slider */
-  simulationImageUrl: string;
-  /** Original photo URL */
+  detected_features: DetectedFeatures;
+  category: GroomingCategory;
+  style_goal: StyleGoal;
+}
+
+/** Shape used internally by the UI */
+export interface AnalysisResult {
   originalImageUrl: string;
+  feedback: FeedbackSection[];
+  detected?: DetectedFeatures;
 }
 
 export type SimulationVariant =
