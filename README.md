@@ -1,36 +1,122 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AI Grooming Coach
 
-## Getting Started
+An AI-powered grooming coach for men. Upload a photo and get personalized coaching feedback on hair, beard, and mustache — delivered in under 30 seconds.
 
-First, run the development server:
+## Stack
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+| Layer | Technology |
+|---|---|
+| Frontend | Next.js 14 (App Router) + Tailwind CSS + TypeScript |
+| AI Service | Python FastAPI + MediaPipe + OpenAI GPT-4o Vision |
+| Icons | Lucide React |
+| Font | Inter (via next/font/google) |
+
+## Project Structure
+
+```
+ai-grooming-coach/
+├── src/
+│   ├── app/                    # Next.js App Router pages
+│   │   ├── page.tsx            # Welcome / Landing
+│   │   ├── category/           # Grooming category selection
+│   │   ├── style-goal/         # Style goal selection
+│   │   ├── upload/             # Photo upload
+│   │   ├── analyzing/          # Loading / analysis in progress
+│   │   ├── results/            # Results dashboard (Feedback / Simulation / Barber Guide)
+│   │   └── chat/               # Premium AI coach chat
+│   ├── components/ui/          # Design system components
+│   │   ├── Button.tsx
+│   │   ├── Card.tsx
+│   │   ├── SelectionChip.tsx
+│   │   ├── ProgressBar.tsx
+│   │   └── BeforeAfterSlider.tsx
+│   ├── lib/
+│   │   └── mock-data.ts        # Mock product data (replaced by API in RVI-13)
+│   └── types/
+│       └── analysis.ts         # TypeScript interfaces for analysis data
+├── api/                        # Python FastAPI AI service
+│   ├── main.py                 # FastAPI app — GET /health, POST /analyze
+│   ├── models.py               # Pydantic request/response models
+│   ├── services/
+│   │   ├── face_detection.py   # MediaPipe FaceMesh face + landmark detection
+│   │   └── feedback.py         # GPT-4o Vision coaching feedback generation
+│   ├── requirements.txt
+│   └── .env.example
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Local Development
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Frontend (Next.js)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```powershell
+npm install
+npm run dev
+```
 
-## Learn More
+Open [http://localhost:3000](http://localhost:3000)
 
-To learn more about Next.js, take a look at the following resources:
+### AI Service (FastAPI)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```powershell
+cd api
+# Copy and fill in your OpenAI key
+cp .env.example .env
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8000
+```
 
-## Deploy on Vercel
+API runs at [http://localhost:8000](http://localhost:8000)  
+Interactive docs at [http://localhost:8000/docs](http://localhost:8000/docs)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Environment Variables (`api/.env`)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```
+OPENAI_API_KEY=sk-...
+CORS_ORIGINS=http://localhost:3000
+```
+
+## API Reference
+
+### `GET /health`
+Returns `{"status": "ok"}` — liveness check.
+
+### `POST /analyze`
+Accepts a multipart form with:
+- `photo` — JPEG/PNG image, max 10MB, front-facing
+- `category` — `hair` | `beard` | `mustache` | `full_grooming`
+- `style_goal` — `professional` | `dating` | `clean_everyday` | `rugged` | `modern`
+- `current_style` _(optional)_ — `casual` | `professional` | `rugged` | `minimalist` | `unsure`
+
+Returns structured grooming feedback with coaching observations, improvement opportunities, and barber tips per grooming area.
+
+## Features
+
+| Feature | Status |
+|---|---|
+| Welcome screen + user flow | Done (RVI-10, RVI-11) |
+| Grooming category selection | Done |
+| Style goal selection | Done |
+| Photo upload with preview | Done |
+| Analysis loading screen | Done |
+| Results: coaching feedback | Done (mock data) |
+| Results: before/after simulation slider | Done (mock data) |
+| Results: annotated barber guide | Done (mock data) |
+| Premium AI coach chat UI | Done (locked, mock) |
+| FastAPI AI service | Done (RVI-12) |
+| Face detection (MediaPipe) | Done |
+| GPT-4o Vision feedback | Done |
+| Frontend ↔ API connection | Planned (RVI-13) |
+| Visual simulation (Replicate) | Planned (RVI-14) |
+| Download + Stripe premium | Planned (RVI-15) |
+
+## Roadmap
+
+| Phase | Issue | Status |
+|---|---|---|
+| Project scaffold + design system | RVI-10 | Done |
+| All UI screens (static/mocked) | RVI-11 | Done |
+| Python FastAPI AI service | RVI-12 | Done |
+| Connect frontend to AI service | RVI-13 | Planned |
+| Visual simulation (Replicate) | RVI-14 | Planned |
+| Download, Stripe, AI chat | RVI-15 | Planned |
