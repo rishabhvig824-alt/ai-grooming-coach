@@ -8,6 +8,34 @@ All notable changes to this project are documented here.
 
 ---
 
+## [0.4.1] — Code review fixes (RVI-13)
+
+### Fixed
+- `analyzing/page.tsx` — navigation `setTimeout` stored in ref so cleanup always clears it; prevents timer leak on unmount
+- `analyzing/page.tsx` — base64 string validated before `atob()` call; corrupt/missing session data now falls back to mock instead of crashing
+- `analyzing/page.tsx` — query param keys corrected from camelCase (`styleGoal`, `currentStyle`) to snake_case (`style_goal`, `current_style`) to match style-goal page output; user's selected goal now reaches the API correctly
+- `analyzing/page.tsx` — removed `console.error` from production network-error fallback
+- `upload/page.tsx` — `sessionStorage.setItem` calls inside `reader.onload` wrapped in `try/catch`; `QuotaExceededError` now surfaces a user-facing message instead of silently failing
+- `results/page.tsx` — replaced `alert()` download stubs with disabled buttons and "coming soon" label
+- `results/page.tsx` — removed redundant `: FeedbackSection` type annotation on `feedback.map()` callback
+
+---
+
+## [0.4.0] — RVI-13: Connect Frontend to AI Service
+
+### Added
+- `src/lib/api.ts` — typed `analyzePhoto()` client; `ApiError` class with `statusCode` for structured error handling
+
+### Changed
+- `src/app/upload/page.tsx` — photo encoded to base64 via `FileReader` and stored in `sessionStorage` on "Use This Photo"; passes `groomingPhoto`, `groomingPhotoName`, `groomingPhotoType` keys
+- `src/app/analyzing/page.tsx` — drives real `POST /analyze` call; tracks live progress up to 90% while waiting; surfaces 400 errors (e.g. no face detected) to user; falls back to mock data on network/server errors
+- `src/app/results/page.tsx` — reads live `AnalysisResponse` from `sessionStorage`; original photo used as "before" in BeforeAfterSlider; falls back to mock when `?mock=1` param is set
+- `src/types/analysis.ts` — added `AnalysisResponse` (API contract) and `DetectedFeatures` interfaces; simplified `AnalysisResult` to UI-only shape
+- `src/lib/mock-data.ts` — updated `mockAnalysisResult` to match simplified `AnalysisResult` type
+- `.env.local` — added `NEXT_PUBLIC_API_URL=http://localhost:8000` (gitignored)
+
+---
+
 ## [0.3.0] — RVI-12: Python FastAPI AI Service
 
 ### Added

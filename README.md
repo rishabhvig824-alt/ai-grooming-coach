@@ -31,7 +31,8 @@ ai-grooming-coach/
 │   │   ├── ProgressBar.tsx
 │   │   └── BeforeAfterSlider.tsx
 │   ├── lib/
-│   │   └── mock-data.ts        # Mock product data (replaced by API in RVI-13)
+│   │   ├── api.ts              # Typed analyzePhoto() client + ApiError class
+│   │   └── mock-data.ts        # Fallback mock data (used when API is unavailable)
 │   └── types/
 │       └── analysis.ts         # TypeScript interfaces for analysis data
 ├── api/                        # Python FastAPI AI service
@@ -69,11 +70,17 @@ uvicorn main:app --reload --port 8000
 API runs at [http://localhost:8000](http://localhost:8000)  
 Interactive docs at [http://localhost:8000/docs](http://localhost:8000/docs)
 
-### Environment Variables (`api/.env`)
+### Environment Variables
 
+**`api/.env`** (AI service):
 ```
 OPENAI_API_KEY=sk-...
 CORS_ORIGINS=http://localhost:3000
+```
+
+**`.env.local`** (frontend):
+```
+NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
 
 ## API Reference
@@ -99,14 +106,14 @@ Returns structured grooming feedback with coaching observations, improvement opp
 | Style goal selection | Done |
 | Photo upload with preview | Done |
 | Analysis loading screen | Done |
-| Results: coaching feedback | Done (mock data) |
-| Results: before/after simulation slider | Done (mock data) |
-| Results: annotated barber guide | Done (mock data) |
+| Results: coaching feedback | Done — live GPT-4o output (RVI-13) |
+| Results: before/after simulation slider | Done — user photo as "before", mock "after" (RVI-13) |
+| Results: annotated barber guide | Done — fixed annotations on user photo (RVI-13) |
 | Premium AI coach chat UI | Done (locked, mock) |
 | FastAPI AI service | Done (RVI-12) |
 | Face detection (MediaPipe) | Done |
 | GPT-4o Vision feedback | Done |
-| Frontend ↔ API connection | Planned (RVI-13) |
+| Frontend ↔ API connection | Done (RVI-13) |
 | Visual simulation (Replicate) | Planned (RVI-14) |
 | Download + Stripe premium | Planned (RVI-15) |
 
@@ -117,6 +124,6 @@ Returns structured grooming feedback with coaching observations, improvement opp
 | Project scaffold + design system | RVI-10 | Done |
 | All UI screens (static/mocked) | RVI-11 | Done |
 | Python FastAPI AI service | RVI-12 | Done |
-| Connect frontend to AI service | RVI-13 | Planned |
+| Connect frontend to AI service | RVI-13 | Done |
 | Visual simulation (Replicate) | RVI-14 | Planned |
 | Download, Stripe, AI chat | RVI-15 | Planned |
