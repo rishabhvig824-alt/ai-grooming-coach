@@ -24,12 +24,10 @@ function AnalyzingScreen() {
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
-    // Advance through copy steps
     const stepTimer = setInterval(() => {
       setStepIndex((prev) => Math.min(prev + 1, STEPS.length - 1));
     }, STEP_INTERVAL_MS);
 
-    // Smooth progress bar increment
     const progressTimer = setInterval(() => {
       setProgress((prev) => {
         if (prev >= 95) return prev;
@@ -37,18 +35,20 @@ function AnalyzingScreen() {
       });
     }, 60);
 
-    // Redirect to results after simulated delay
+    // Capture the inner nav timer so it can be cleared on unmount
+    let navTimer: ReturnType<typeof setTimeout>;
     const redirectTimer = setTimeout(() => {
       clearInterval(stepTimer);
       clearInterval(progressTimer);
       setProgress(100);
-      setTimeout(() => router.push(`/results?${params.toString()}`), 300);
+      navTimer = setTimeout(() => router.push(`/results?${params.toString()}`), 300);
     }, SIMULATED_DURATION_MS);
 
     return () => {
       clearInterval(stepTimer);
       clearInterval(progressTimer);
       clearTimeout(redirectTimer);
+      clearTimeout(navTimer);
     };
   }, [router, params]);
 

@@ -22,6 +22,7 @@ function UploadForm() {
 
   const [preview, setPreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const blobUrlRef = useRef<string | null>(null);
 
   const MAX_SIZE_MB = 10;
 
@@ -31,7 +32,10 @@ function UploadForm() {
       setError(`Photo must be under ${MAX_SIZE_MB}MB.`);
       return;
     }
+    // Revoke any previous blob URL before creating a new one
+    if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
     const url = URL.createObjectURL(file);
+    blobUrlRef.current = url;
     setPreview(url);
   };
 
@@ -41,6 +45,10 @@ function UploadForm() {
   };
 
   const handleRetake = () => {
+    if (blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current);
+      blobUrlRef.current = null;
+    }
     setPreview(null);
     setError(null);
     if (fileInputRef.current) fileInputRef.current.value = "";

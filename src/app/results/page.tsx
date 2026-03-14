@@ -28,7 +28,7 @@ function ResultsDashboard() {
   const [activeTab, setActiveTab] = useState<Tab>("feedback");
   const [activeVariant, setActiveVariant] = useState<SimulationVariant>("mid_fade");
 
-  const { feedback, originalImageUrl, simulationImageUrl } = mockAnalysisResult;
+  const { feedback, originalImageUrl } = mockAnalysisResult;
 
   return (
     <main className="min-h-screen bg-surface-bg flex flex-col">

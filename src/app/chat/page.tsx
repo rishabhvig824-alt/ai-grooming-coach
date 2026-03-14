@@ -12,15 +12,15 @@ const EXAMPLE_QUESTIONS = [
   "What products should I use for my hair type?",
 ];
 
-type Message = { role: "user" | "coach"; text: string };
+type Message = { id: string; role: "user" | "coach"; text: string };
 
 const MOCK_RESPONSE =
   "Based on your analysis, a mid fade with a textured top would complement your face shape well. Ask your barber for about 1.5 inches on top and a skin fade from the temples down. For maintenance, trim every 3–4 weeks to keep the shape sharp.";
 
 export default function ChatPage() {
   const router = useRouter();
-  // Toggle this to true to preview the premium state
-  const [isPremium] = useState(false);
+  // Wired to Supabase auth in RVI-15 — false = free tier, true = premium
+  const isPremium = false;
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
 
@@ -28,8 +28,8 @@ export default function ChatPage() {
     if (!text.trim()) return;
     setMessages((prev) => [
       ...prev,
-      { role: "user", text },
-      { role: "coach", text: MOCK_RESPONSE },
+      { id: crypto.randomUUID(), role: "user", text },
+      { id: crypto.randomUUID(), role: "coach", text: MOCK_RESPONSE },
     ]);
     setInput("");
   };
@@ -75,9 +75,9 @@ export default function ChatPage() {
                 ))}
               </div>
             )}
-            {messages.map((msg, i) => (
+            {messages.map((msg) => (
               <div
-                key={i}
+                key={msg.id}
                 className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
               >
                 <div

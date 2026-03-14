@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Scissors, Smile, User, Star, Shirt, Glasses, Sparkles, Lock, ChevronLeft } from "lucide-react";
-import { Button, Card } from "@/components/ui";
+import { Button } from "@/components/ui";
 import { groomingCategories, lockedCategories } from "@/lib/mock-data";
 import type { GroomingCategory } from "@/types/analysis";
 
