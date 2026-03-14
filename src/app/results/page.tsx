@@ -6,7 +6,7 @@ import Image from "next/image";
 import { Download, MessageCircle, ChevronLeft, CheckCircle, ArrowRight } from "lucide-react";
 import { Button, Card, BeforeAfterSlider } from "@/components/ui";
 import { mockAnalysisResult, simulationVariants } from "@/lib/mock-data";
-import type { AnalysisResult, AnalysisResponse, FeedbackSection, SimulationVariant } from "@/types/analysis";
+import type { AnalysisResult, AnalysisResponse, SimulationVariant } from "@/types/analysis";
 import { Suspense } from "react";
 
 type Tab = "feedback" | "simulation" | "barber-guide";
@@ -104,7 +104,7 @@ function ResultsDashboard() {
         {/* FEEDBACK TAB */}
         {activeTab === "feedback" && (
           <div className="space-y-4">
-            {feedback.map((section: FeedbackSection) => (
+            {feedback.map((section) => (
               <Card key={section.area}>
                 <div className="flex items-center gap-2 mb-3">
                   <CheckCircle className="w-4 h-4 text-feedback-success flex-shrink-0" />
@@ -212,12 +212,9 @@ function ResultsDashboard() {
               </div>
             </div>
 
-            <Button
-              fullWidth
-              variant="secondary"
-              onClick={() => alert("Download coming in Phase 6 (RVI-15)")}
-            >
+            <Button fullWidth variant="secondary" disabled>
               <Download className="w-4 h-4 mr-2" /> Download Guide
+              <span className="ml-2 text-xs opacity-60">(coming soon)</span>
             </Button>
 
             <p className="text-center text-xs text-content-secondary mt-4">
@@ -236,11 +233,9 @@ function ResultsDashboard() {
         >
           <MessageCircle className="w-4 h-4 mr-2" /> Ask Coach
         </Button>
-        <Button
-          onClick={() => alert("Download coming in Phase 6 (RVI-15)")}
-          className="flex-1"
-        >
+        <Button disabled className="flex-1">
           <Download className="w-4 h-4 mr-2" /> Download
+          <span className="ml-1.5 text-xs opacity-60">(soon)</span>
         </Button>
       </div>
     </main>

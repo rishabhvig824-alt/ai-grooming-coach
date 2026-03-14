@@ -25,55 +25,59 @@ function AnalyzingScreen() {
   const [progress, setProgress] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Use a ref so the cleanup closure always sees the latest timers
   const timersRef = useRef<ReturnType<typeof setInterval>[]>([]);
+  const navTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasStarted = useRef(false);
 
   useEffect(() => {
     if (hasStarted.current) return;
     hasStarted.current = true;
 
-    // Step text animation — advances every STEP_INTERVAL_MS
     const stepTimer = setInterval(() => {
       setStepIndex((prev) => Math.min(prev + 1, STEPS.length - 1));
     }, STEP_INTERVAL_MS);
     timersRef.current.push(stepTimer);
 
-    // Smooth progress fill up to 90% while we wait for the API
     const progressTimer = setInterval(() => {
       setProgress((prev) => {
         if (prev >= 90) return prev;
-        // Logarithmic feel: fast at first, slows near 90
         const increment = Math.max(0.3, (90 - prev) * 0.025);
         return Math.min(prev + increment, 90);
       });
     }, 80);
     timersRef.current.push(progressTimer);
 
-    // Retrieve photo + params from sessionStorage
+    // Read URL params — style-goal page pushes snake_case keys
     const base64 = sessionStorage.getItem("groomingPhoto");
     const fileName = sessionStorage.getItem("groomingPhotoName") ?? "photo.jpg";
     const fileType = sessionStorage.getItem("groomingPhotoType") ?? "image/jpeg";
     const category = (params.get("category") ?? "full_grooming") as GroomingCategory;
-    const styleGoal = (params.get("styleGoal") ?? "clean_everyday") as StyleGoal;
-    const currentStyle = (params.get("currentStyle") ?? undefined) as CurrentStyle | undefined;
+    const styleGoal = (params.get("style_goal") ?? "clean_everyday") as StyleGoal;
+    const currentStyle = (params.get("current_style") ?? undefined) as CurrentStyle | undefined;
 
     const navigate = (query: URLSearchParams) => {
       timersRef.current.forEach(clearInterval);
       setProgress(100);
-      setTimeout(() => router.push(`/results?${query.toString()}`), 300);
+      navTimerRef.current = setTimeout(() => router.push(`/results?${query.toString()}`), 300);
     };
 
     if (!base64) {
-      // No photo in session — fall back to mock data flow
       const q = new URLSearchParams(params.toString());
       q.set("mock", "1");
       navigate(q);
       return;
     }
 
-    // Decode base64 back to a File object
-    const byteString = atob(base64.split(",")[1]);
+    // Validate that base64 is a proper data URL before decoding
+    const parts = base64.split(",");
+    if (parts.length < 2 || !parts[1]) {
+      const q = new URLSearchParams(params.toString());
+      q.set("mock", "1");
+      navigate(q);
+      return;
+    }
+
+    const byteString = atob(parts[1]);
     const ab = new ArrayBuffer(byteString.length);
     const ia = new Uint8Array(ab);
     for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
@@ -82,7 +86,6 @@ function AnalyzingScreen() {
     analyzePhoto(file, category, styleGoal, currentStyle)
       .then((result) => {
         sessionStorage.setItem("analysisResult", JSON.stringify(result));
-        // Store the original photo for the before/after slider
         sessionStorage.setItem("groomingPhotoBeforeUrl", base64);
         const q = new URLSearchParams(params.toString());
         navigate(q);
@@ -90,11 +93,8 @@ function AnalyzingScreen() {
       .catch((err) => {
         timersRef.current.forEach(clearInterval);
         if (err instanceof ApiError && err.statusCode === 400) {
-          // e.g. "No face detected" — surface to user
           setErrorMsg(err.message);
         } else {
-          // Network/server error — fall back gracefully to mock
-          console.error("Analysis API error:", err);
           const q = new URLSearchParams(params.toString());
           q.set("mock", "1");
           navigate(q);
@@ -104,6 +104,7 @@ function AnalyzingScreen() {
     const timersCopy = timersRef.current;
     return () => {
       timersCopy.forEach(clearInterval);
+      if (navTimerRef.current) clearTimeout(navTimerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -128,7 +129,6 @@ function AnalyzingScreen() {
 
   return (
     <main className="min-h-screen bg-surface-bg flex flex-col items-center justify-center px-4">
-      {/* Animated logo mark */}
       <div className="w-16 h-16 rounded-2xl bg-brand-primary flex items-center justify-center mb-8 animate-pulse">
         <Sparkles className="w-8 h-8 text-white" />
       </div>
@@ -140,12 +140,10 @@ function AnalyzingScreen() {
         Your grooming coach is reviewing your look.
       </p>
 
-      {/* Progress bar */}
       <div className="w-full max-w-xs mb-6">
         <ProgressBar value={progress} label="Analysis progress" />
       </div>
 
-      {/* Step copy */}
       <p
         key={stepIndex}
         className="text-content-secondary text-sm text-center transition-opacity duration-300"

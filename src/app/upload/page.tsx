@@ -68,11 +68,16 @@ function UploadForm() {
       // Encode photo as base64 for sessionStorage handoff to /analyzing
       const reader = new FileReader();
       reader.onload = () => {
-        const base64 = reader.result as string;
-        sessionStorage.setItem("groomingPhoto", base64);
-        sessionStorage.setItem("groomingPhotoName", file.name);
-        sessionStorage.setItem("groomingPhotoType", file.type);
-        router.push(`/analyzing?${params.toString()}`);
+        try {
+          const base64 = reader.result as string;
+          sessionStorage.setItem("groomingPhoto", base64);
+          sessionStorage.setItem("groomingPhotoName", file.name);
+          sessionStorage.setItem("groomingPhotoType", file.type);
+          router.push(`/analyzing?${params.toString()}`);
+        } catch {
+          setError("Could not store the photo. Please try again.");
+          setIsStoring(false);
+        }
       };
       reader.onerror = () => {
         setError("Failed to read the photo. Please try again.");
