@@ -12,9 +12,10 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 
-from models import AnalysisResponse, GroomingCategory, StyleGoal
+from models import AnalysisResponse, GroomingCategory, SimulationResponse, SimulationStatusResponse, SimulationVariant, StyleGoal
 from services.face_detection import analyze_face
 from services.feedback import generate_feedback
+from services.simulation import get_simulation_status, start_simulation
 
 load_dotenv()
 
@@ -102,3 +103,61 @@ async def analyze(
         category=category,
         style_goal=style_goal,
     )
+
+
+@app.post(
+    "/simulate",
+    response_model=SimulationResponse,
+    tags=["simulation"],
+    summary="Start an async grooming simulation via Replicate",
+)
+async def simulate(
+    photo: UploadFile = File(..., description="Front-facing selfie (JPEG/PNG, max 10MB)"),
+    variant: SimulationVariant = Form(...),
+) -> SimulationResponse:
+    if photo.content_type not in ALLOWED_MIME_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Unsupported file type: {photo.content_type}. Please upload a JPEG or PNG.",
+        )
+
+    image_bytes = await photo.read()
+
+    if len(image_bytes) > MAX_FILE_SIZE_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Photo must be under {MAX_FILE_SIZE_MB}MB.",
+        )
+
+    try:
+        prediction_id = start_simulation(image_bytes, variant)
+    except RuntimeError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(e),
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Simulation could not be started: {str(e)}",
+        )
+
+    return SimulationResponse(prediction_id=prediction_id, status="processing")
+
+
+@app.get(
+    "/simulate/status",
+    response_model=SimulationStatusResponse,
+    tags=["simulation"],
+    summary="Poll the status of a Replicate simulation prediction",
+)
+async def simulate_status(prediction_id: str) -> SimulationStatusResponse:
+    try:
+        sim_status, image_url = get_simulation_status(prediction_id)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Could not fetch simulation status: {str(e)}",
+        )
+
+    return SimulationStatusResponse(status=sim_status, image_url=image_url)

@@ -49,3 +49,12 @@ export type SimulationVariant =
   | "stubble"
   | "mid_fade"
   | "taper_fade";
+
+/** Lifecycle state of a single simulation variant */
+export type SimulationStatus = "idle" | "loading" | "ready" | "failed";
+
+export interface SimulationState {
+  status: SimulationStatus;
+  /** Replicate-generated image URL, populated when status is "ready" */
+  imageUrl: string | null;
+}

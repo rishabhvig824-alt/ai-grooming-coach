@@ -7,3 +7,4 @@ Pillow==10.3.0
 pydantic==2.7.1
 pydantic-settings==2.3.0
 python-dotenv==1.0.1
+replicate==0.31.0

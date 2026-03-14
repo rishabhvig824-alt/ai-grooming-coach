@@ -6,6 +6,7 @@ GroomingCategory = Literal["hair", "beard", "mustache", "full_grooming"]
 StyleGoal = Literal["professional", "dating", "clean_everyday", "rugged", "modern"]
 CurrentStyle = Literal["casual", "professional", "rugged", "minimalist", "unsure"]
 AreaType = Literal["hair", "beard", "mustache"]
+SimulationVariant = Literal["short_beard", "stubble", "mid_fade", "taper_fade"]
 
 
 class FeedbackSection(BaseModel):
@@ -39,3 +40,13 @@ class AnalysisResponse(BaseModel):
 class ErrorResponse(BaseModel):
     error: str
     detail: str
+
+
+class SimulationResponse(BaseModel):
+    prediction_id: str
+    status: str = "processing"
+
+
+class SimulationStatusResponse(BaseModel):
+    status: str
+    image_url: Optional[str] = None

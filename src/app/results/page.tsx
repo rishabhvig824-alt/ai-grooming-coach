@@ -1,12 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
-import { Download, MessageCircle, ChevronLeft, CheckCircle, ArrowRight } from "lucide-react";
+import { Download, MessageCircle, ChevronLeft, CheckCircle, ArrowRight, Loader2 } from "lucide-react";
 import { Button, Card, BeforeAfterSlider } from "@/components/ui";
 import { mockAnalysisResult, simulationVariants } from "@/lib/mock-data";
-import type { AnalysisResult, AnalysisResponse, SimulationVariant } from "@/types/analysis";
+import { startSimulation, pollSimulation } from "@/lib/api";
+import type {
+  AnalysisResult,
+  AnalysisResponse,
+  SimulationVariant,
+  SimulationState,
+} from "@/types/analysis";
 import { Suspense } from "react";
 
 type Tab = "feedback" | "simulation" | "barber-guide";
@@ -23,6 +29,16 @@ const AREA_LABELS: Record<string, string> = {
   mustache: "Mustache",
 };
 
+const ALL_VARIANTS = Object.keys(simulationVariants) as SimulationVariant[];
+
+const IDLE_STATE: SimulationState = { status: "idle", imageUrl: null };
+
+function buildInitialSimMap(): Record<SimulationVariant, SimulationState> {
+  return Object.fromEntries(
+    ALL_VARIANTS.map((v) => [v, IDLE_STATE]),
+  ) as Record<SimulationVariant, SimulationState>;
+}
+
 /** Map the API response shape to the UI data shape */
 function mapApiResponse(response: AnalysisResponse, photoBase64: string): AnalysisResult {
   return {
@@ -32,6 +48,24 @@ function mapApiResponse(response: AnalysisResponse, photoBase64: string): Analys
   };
 }
 
+/** Reconstruct a File object from the base64 data URI stored in sessionStorage */
+function fileFromBase64(base64: string, name: string, type: string): File | null {
+  try {
+    const parts = base64.split(",");
+    if (parts.length < 2 || !parts[1]) return null;
+    const bytes = atob(parts[1]);
+    const ab = new ArrayBuffer(bytes.length);
+    const ia = new Uint8Array(ab);
+    for (let i = 0; i < bytes.length; i++) ia[i] = bytes.charCodeAt(i);
+    return new File([ab], name, { type });
+  } catch {
+    return null;
+  }
+}
+
+const POLL_INTERVAL_MS = 3000;
+const POLL_TIMEOUT_MS = 60000;
+
 function ResultsDashboard() {
   const router = useRouter();
   const params = useSearchParams();
@@ -39,7 +73,15 @@ function ResultsDashboard() {
   const [activeTab, setActiveTab] = useState<Tab>("feedback");
   const [activeVariant, setActiveVariant] = useState<SimulationVariant>("mid_fade");
   const [data, setData] = useState<AnalysisResult | null>(null);
+  const [simMap, setSimMap] = useState<Record<SimulationVariant, SimulationState>>(buildInitialSimMap);
 
+  // Track per-variant polling intervals so we can clear on unmount or completion
+  const pollingRef = useRef<Partial<Record<SimulationVariant, ReturnType<typeof setInterval>>>>({});
+  const timeoutRef = useRef<Partial<Record<SimulationVariant, ReturnType<typeof setTimeout>>>>({});
+  // Store reconstructed File to avoid re-decoding base64 per chip tap
+  const photoFileRef = useRef<File | null>(null);
+
+  // ── Load analysis result ────────────────────────────────────────────────
   useEffect(() => {
     const isMock = params.get("mock") === "1";
 
@@ -57,13 +99,112 @@ function ResultsDashboard() {
       }
     }
 
-    // Fall back to mock data
     setData(mockAnalysisResult);
   }, [params]);
+
+  // ── Polling helper ──────────────────────────────────────────────────────
+  const stopPolling = useCallback((variant: SimulationVariant) => {
+    if (pollingRef.current[variant]) {
+      clearInterval(pollingRef.current[variant]);
+      delete pollingRef.current[variant];
+    }
+    if (timeoutRef.current[variant]) {
+      clearTimeout(timeoutRef.current[variant]);
+      delete timeoutRef.current[variant];
+    }
+  }, []);
+
+  const beginPolling = useCallback(
+    (variant: SimulationVariant, predictionId: string) => {
+      // Hard timeout — mark failed if not done within 60s
+      timeoutRef.current[variant] = setTimeout(() => {
+        stopPolling(variant);
+        setSimMap((prev) => ({ ...prev, [variant]: { status: "failed", imageUrl: null } }));
+      }, POLL_TIMEOUT_MS);
+
+      pollingRef.current[variant] = setInterval(async () => {
+        try {
+          const { status, imageUrl } = await pollSimulation(predictionId);
+          if (status === "succeeded" && imageUrl) {
+            stopPolling(variant);
+            setSimMap((prev) => ({ ...prev, [variant]: { status: "ready", imageUrl } }));
+          } else if (status === "failed") {
+            stopPolling(variant);
+            setSimMap((prev) => ({ ...prev, [variant]: { status: "failed", imageUrl: null } }));
+          }
+          // status === "processing" — keep polling
+        } catch {
+          // Network hiccup — keep polling until timeout
+        }
+      }, POLL_INTERVAL_MS);
+    },
+    [stopPolling],
+  );
+
+  // ── Kick off simulation for a variant ──────────────────────────────────
+  const triggerSimulation = useCallback(
+    async (variant: SimulationVariant) => {
+      const file = photoFileRef.current;
+      if (!file) return;
+
+      setSimMap((prev) => ({ ...prev, [variant]: { status: "loading", imageUrl: null } }));
+
+      try {
+        const predictionId = await startSimulation(file, variant);
+        beginPolling(variant, predictionId);
+      } catch {
+        // 503 = no Replicate token, any other error — fail silently, fallback shown
+        setSimMap((prev) => ({ ...prev, [variant]: { status: "failed", imageUrl: null } }));
+      }
+    },
+    [beginPolling],
+  );
+
+  // ── Start default simulation once data loads ────────────────────────────
+  useEffect(() => {
+    if (!data) return;
+
+    const base64 = sessionStorage.getItem("groomingPhoto");
+    const name = sessionStorage.getItem("groomingPhotoName") ?? "photo.jpg";
+    const type = sessionStorage.getItem("groomingPhotoType") ?? "image/jpeg";
+
+    if (!base64) return; // mock flow — no real photo, skip simulation
+    const file = fileFromBase64(base64, name, type);
+    if (!file) return;
+
+    photoFileRef.current = file;
+    triggerSimulation("mid_fade");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
+
+  // ── Cleanup all polling on unmount ──────────────────────────────────────
+  useEffect(() => {
+    const polling = pollingRef.current;
+    const timeouts = timeoutRef.current;
+    return () => {
+      Object.values(polling).forEach((id) => id && clearInterval(id));
+      Object.values(timeouts).forEach((id) => id && clearTimeout(id));
+    };
+  }, []);
+
+  // ── Variant chip tap ────────────────────────────────────────────────────
+  const handleVariantTap = (variant: SimulationVariant) => {
+    setActiveVariant(variant);
+    if (simMap[variant].status === "idle") {
+      triggerSimulation(variant);
+    }
+  };
 
   if (!data) return null;
 
   const { feedback, originalImageUrl } = data;
+  const activeSimState = simMap[activeVariant];
+
+  // Determine what to show in the "after" slot of the slider
+  const afterSrc =
+    activeSimState.status === "ready" && activeSimState.imageUrl
+      ? activeSimState.imageUrl
+      : simulationVariants[activeVariant].imageUrl; // mock fallback
 
   return (
     <main className="min-h-screen bg-surface-bg flex flex-col">
@@ -144,30 +285,58 @@ function ResultsDashboard() {
             <p className="text-content-secondary text-sm mb-4">
               Drag the slider to compare your current look with a simulated improvement.
             </p>
-            <BeforeAfterSlider
-              beforeSrc={originalImageUrl}
-              afterSrc={simulationVariants[activeVariant].imageUrl}
-              className="mb-4"
-            />
 
+            {/* Slider or skeleton */}
+            {activeSimState.status === "loading" ? (
+              <div className="w-full aspect-[3/4] rounded-card bg-gray-100 animate-pulse flex flex-col items-center justify-center gap-3 mb-4">
+                <Loader2 className="w-8 h-8 text-brand-primary/40 animate-spin" />
+                <p className="text-content-secondary text-sm">Generating your simulation…</p>
+                <p className="text-content-secondary text-xs">This takes 15–30 seconds</p>
+              </div>
+            ) : (
+              <>
+                <BeforeAfterSlider
+                  beforeSrc={originalImageUrl}
+                  afterSrc={afterSrc}
+                  className="mb-2"
+                />
+                {activeSimState.status === "ready" ? (
+                  <p className="text-xs text-content-secondary text-center mb-4">
+                    AI-generated preview — results may vary
+                  </p>
+                ) : (
+                  <p className="text-xs text-content-secondary text-center mb-4">
+                    Style preview
+                  </p>
+                )}
+              </>
+            )}
+
+            {/* Style chips */}
             <p className="text-xs text-content-secondary font-medium uppercase tracking-wide mb-3">
               Try other styles
             </p>
             <div className="flex flex-wrap gap-2 mb-6">
               {(Object.entries(simulationVariants) as [SimulationVariant, { label: string }][]).map(
-                ([id, { label }]) => (
-                  <button
-                    key={id}
-                    onClick={() => setActiveVariant(id)}
-                    className={`px-4 py-2 rounded-chip text-sm font-medium transition-colors ${
-                      activeVariant === id
-                        ? "bg-brand-primary text-white"
-                        : "bg-chip-inactive text-content-primary"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                )
+                ([id, { label }]) => {
+                  const varState = simMap[id];
+                  return (
+                    <button
+                      key={id}
+                      onClick={() => handleVariantTap(id)}
+                      className={`px-4 py-2 rounded-chip text-sm font-medium transition-colors flex items-center gap-1.5 ${
+                        activeVariant === id
+                          ? "bg-brand-primary text-white"
+                          : "bg-chip-inactive text-content-primary"
+                      }`}
+                    >
+                      {varState.status === "loading" && activeVariant === id && (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      )}
+                      {label}
+                    </button>
+                  );
+                },
               )}
             </div>
           </div>
